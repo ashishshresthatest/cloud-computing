@@ -18,14 +18,21 @@
 # initial if statement to make sure that you pass the commandline variables via
 # the arguments.txt file
 # Fill in the blanks below
-if [ $# = 0 ]
+if [ $# -ne 7 ]
 then
   echo 'You do not have enough variable in your arugments.txt, perhaps you forgot to run: bash ./create-env.sh $(< ~/arguments.txt)'
   exit 1
 else
 echo "Beginning to launch $5 EC2 instances..."
 # https://awscli.amazonaws.com/v2/documentation/api/latest/reference/ec2/run-instances.html
-aws ec2 run-instances 
+aws ec2 run-instances \
+    --image-id "$1" \
+    --instance-type "$2" \
+    --key-name "$3" \
+    --security-group-ids "$4" \
+    --count "$5" \
+    --user-data "file://$6" \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$7}]"
 
 #https://awscli.amazonaws.com/v2/documentation/api/latest/reference/ec2/wait/instance-running.html
 echo "Waiting until instances are in RUNNING state..."
