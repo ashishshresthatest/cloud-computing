@@ -80,15 +80,9 @@ aws ec2 run-instances \
 
 # Collect Instance IDs
 # https://stackoverflow.com/questions/31744316/aws-cli-filter-or-logic
-INSTANCEIDS=$(aws ec2 describe-instances --output=text --query 'Reservations[*].Instances[*].InstanceId' --filter "Name=instance-state-name,Values=running,pending" "Name=tag:Name,Values=$7")
+INSTANCEIDS=$(aws ec2 describe-instances --output=text --query 'Reservations[*].Instances[*].InstanceId' --filters "Name=instance-state-name,Values=running,pending" "Name=tag:Name,Values=$7")
 
 #https://awscli.amazonaws.com/v2/documentation/api/latest/reference/ec2/wait/instance-running.html
-URL=$(aws elbv2 describe-load-balancers \
-  --load-balancer-arns "$ELBARN" \
-  --query 'LoadBalancers[0].DNSName' \
-  --output text)
-
-echo $URL
 echo "Waiting until instances are in the RUNNING state..."
 echo $INSTANCEIDS
 
@@ -112,12 +106,11 @@ fi
 
 # Retreive ELBv2 URL via aws elbv2 describe-load-balancers --query and print it to the screen
 #https://awscli.amazonaws.com/v2/documentation/api/latest/reference/elbv2/describe-load-balancers.html
+
 URL=$(aws elbv2 describe-load-balancers \
   --load-balancer-arns "$ELBARN" \
   --query 'LoadBalancers[0].DNSName' \
   --output text)
-
 echo $URL
-
 # end of outer fi - based on arguments.txt content
 fi
