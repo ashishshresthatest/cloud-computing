@@ -49,8 +49,8 @@ VPCID=$(aws ec2 describe-vpcs --filters "Name=is-default,Values=true" --query "V
 echo $VPCID
 
 echo "Finding and storing the subnet IDs for defined in arguments.txt Availability Zone 1 and 2..."
-SUBNET2A=$(aws ec2 describe-subnets --output=text --query='Subnets[*].SubnetId' --filter "Name=availability-zone,Values=${10}")
-SUBNET2B=$(aws ec2 describe-subnets --output=text --query='Subnets[*].SubnetId' --filter "Name=availability-zone,Values=${11}")
+SUBNET2A=$(aws ec2 describe-subnets --output=text --query='Subnets[*].SubnetId' --filters "Name=availability-zone,Values=${10}")
+SUBNET2B=$(aws ec2 describe-subnets --output=text --query='Subnets[*].SubnetId' --filters "Name=availability-zone,Values=${11}")
 echo $SUBNET2A
 echo $SUBNET2B
 
@@ -58,13 +58,13 @@ echo $SUBNET2B
 # https://awscli.amazonaws.com/v2/documentation/api/2.0.33/reference/ec2/create-launch-template.html
 echo "Creating the AutoScalingGroup Launch Template..."
 aws ec2 create-launch-template \
-    --launch-template-name "$12" \
+    --launch-template-name "${12}" \
     --launch-template-data file://config.json
 echo "Launch Template created..."
 
 # Retreive the Launch Template ID using a --query
 LAUNCHTEMPLATEID=$(aws ec2 describe-launch-templates \
-    --launch-template-names "$12" \
+    --launch-template-names "${12}" \
     --query 'LaunchTemplates[0].LaunchTemplateId' \
     --output text)
   echo "$LAUNCHTEMPLATEID"
@@ -112,21 +112,21 @@ echo 'Creating Auto Scaling Group...'
 # Create autoscaling group
 # https://awscli.amazonaws.com/v2/documentation/api/latest/reference/autoscaling/create-auto-scaling-group.html
 aws autoscaling create-auto-scaling-group \
-    --auto-scaling-group-name "$13" \
-    --launch-template LaunchTemplateId="$LAUNCHTEMPLATEID" \
-    --min-size "$14" \
-    --max-size "$15" \
-    --desired-capacity "$16" \
-    --target-group-arns "$TARGETARN" \
-    --vpc-zone-identifier "$SUBNET2A,$SUBNET2B" \
+    --auto-scaling-group-name "${13}" \
+    --launch-template LaunchTemplateId="${LAUNCHTEMPLATEID}" \
+    --min-size "${14}" \
+    --max-size "${15}" \
+    --desired-capacity "${16}" \
+    --target-group-arns "${TARGETARN}" \
+    --vpc-zone-identifier "${SUBNET2A},${SUBNET2B}" \
     --health-check-type ELB \
     --health-check-grace-period 300 \
-    --tags "Key=module,Value=$7,PropagateAtLaunch=true"
+    --tags "Key=module,Value=${7},PropagateAtLaunch=true"
 
 echo 'Waiting for Auto Scaling Group to spin up EC2 instances and attach them to the TargetARN...'
 # Create waiter for registering targets
 # https://docs.aws.amazon.com/cli/latest/reference/elbv2/wait/target-in-service.html
-aws elbv2 wait target-in-service --target-group-arn "$TARGETARN"
+aws elbv2 wait target-in-service --target-group-arn "${TARGETARN}"
 echo "Targets attached to Auto Scaling Group..."
 
 # Collect Instance IDs
@@ -135,7 +135,7 @@ INSTANCEIDS=$(aws ec2 describe-instances --output=text --query 'Reservations[*].
 
 if [ "$INSTANCEIDS" != "" ]
   then
-    aws ec2 wait instance-running
+    aws ec2 wait instance-running --instance-ids $INSTANCEIDS
     echo "Finished launching instances..."
   else
     echo 'There are no running or pending values in $INSTANCEIDS to wait for...'
