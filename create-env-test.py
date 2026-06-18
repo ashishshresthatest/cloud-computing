@@ -94,7 +94,7 @@ print('*' * 79)
 print("Testing to make sure the running EC2 instances are all of type t2.micro...")
 checkInstanceTypeMismatch = False
 for n in range(0,len(responseEC2['Reservations'][0]['Instances'])):
-  if response['Reservations'][0]['Instances'][n]['InstanceType'] == "t2.micro" or responseEC2['Reservations'][0]['Instances'][n]['InstanceType'] == "t3.micro":
+  if responseEC2['Reservations'][0]['Instances'][n]['InstanceType'] == "t2.micro" or responseEC2['Reservations'][0]['Instances'][n]['InstanceType'] == "t3.micro":
     print("InstanceID of: " + responseEC2['Reservations'][0]['Instances'][n]['InstanceId'] + " and of InstanceType: " + responseEC2['Reservations'][0]['Instances'][n]['InstanceType'])
   else:
      checkInstanceTypeMatch = True
