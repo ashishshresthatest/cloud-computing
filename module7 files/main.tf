@@ -9,6 +9,8 @@
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/vpc
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/vpcs
 ##############################################################################
+# Terraform for Module 07
+
 data "aws_vpc" "main" {
   default = true
 }
@@ -16,22 +18,11 @@ data "aws_vpc" "main" {
 output "vpcs" {
   value = data.aws_vpc.main.id
 }
-##############################################################################
-# https://developer.hashicorp.com/terraform/tutorials/configuration-language/data-source
-##############################################################################
+
 data "aws_availability_zones" "available" {
   state = "available"
-  /*
-  filter {
-    name   = "zone-type"
-    values = ["availability-zone"]
-  }
-*/
 }
 
-##############################################################################
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/availability_zones
-##############################################################################
 data "aws_availability_zones" "primary" {
   filter {
     name   = "zone-name"
@@ -46,46 +37,38 @@ data "aws_availability_zones" "secondary" {
   }
 }
 
-##############################################################################
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/subnets
-##############################################################################
-# The data value is essentially a query and or a filter to retrieve values
 data "aws_subnets" "subneta" {
   filter {
-    name   = "availabilityZone"
+    name   = "availability-zone"
     values = ["us-east-2a"]
   }
 }
 
 data "aws_subnets" "subnetb" {
   filter {
-    name   = "availabilityZone"
+    name   = "availability-zone"
     values = ["us-east-2b"]
   }
 }
 
 data "aws_subnets" "subnetc" {
   filter {
-    name   = "availabilityZone"
+    name   = "availability-zone"
     values = ["us-east-2c"]
   }
 }
 
 output "subnetid-2a" {
-  value = [data.aws_subnets.subneta.ids]
+  value = data.aws_subnets.subneta.ids
 }
 
-##############################################################################
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb
-##############################################################################
 resource "aws_lb" "lb" {
-  name               = 
+  name               = var.elb-name
   internal           = false
   load_balancer_type = "application"
-  security_groups    = 
+  security_groups    = [var.vpc_security_group_ids]
+  subnets            = [data.aws_subnets.subneta.ids[0], data.aws_subnets.subnetb.ids[0]]
 
-  subnets = [data.aws_subnets.subneta.ids[0], data.aws_subnets.subnetb.ids[0]]
-  
   enable_deletion_protection = false
 
   tags = {
@@ -93,29 +76,18 @@ resource "aws_lb" "lb" {
   }
 }
 
-# output will print a value out to the screen
 output "url" {
   value = aws_lb.lb.dns_name
 }
 
-##############################################################################
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_target_group
-##############################################################################
-
 resource "aws_lb_target_group" "alb-lb-tg" {
-  # depends_on is effectively a waiter -- it forces this resource to wait until the listed
-  # resource is ready
   depends_on  = [aws_lb.lb]
-  name        = 
-  target_type = 
+  name        = var.tg-name
+  target_type = "instance"
   port        = 80
   protocol    = "HTTP"
-  vpc_id      = 
+  vpc_id      = data.aws_vpc.main.id
 }
-
-##############################################################################
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_listener
-##############################################################################
 
 resource "aws_lb_listener" "front_end" {
   load_balancer_arn = aws_lb.lb.arn
@@ -128,73 +100,75 @@ resource "aws_lb_listener" "front_end" {
   }
 }
 
-##############################################################################
-# Create launch template
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/launch_template
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/launch_template
-##############################################################################
 resource "aws_launch_template" "mp1-lt" {
-  image_id                             = 
+  name                                 = var.lt-name
+  image_id                             = var.imageid
   instance_initiated_shutdown_behavior = "terminate"
-  instance_type                        = 
-  key_name                             = 
+  instance_type                        = var.instance-type
+  key_name                             = var.key-name
 
   monitoring {
     enabled = false
   }
+
   placement {
-    availability_zone = data.aws_availability_zones.primary.id
+    availability_zone = "us-east-2a"
   }
-  
+
   block_device_mappings {
-    device_name = 
+    device_name = "/dev/sda1"
 
     ebs {
-      volume_size = 
+      volume_size = 8
     }
   }
 
   block_device_mappings {
-    device_name = 
+    device_name = "/dev/sdc"
 
     ebs {
-      volume_size = 
+      volume_size = 15
     }
   }
 
   network_interfaces {
-  subnet_id = data.aws_subnets.subneta.ids[0]
-  security_groups = [var.vpc_security_group_ids]
+    subnet_id        = data.aws_subnets.subneta.ids[0]
+    security_groups  = [var.vpc_security_group_ids]
+    associate_public_ip_address = true
   }
-  
+
   tag_specifications {
     resource_type = "instance"
+
     tags = {
-      Name = 
+      Name       = var.module-tag
+      assessment = var.module-tag
     }
   }
+
   user_data = filebase64("./install-env.sh")
 }
 
-##############################################################################
-# Create autoscaling group
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/autoscaling_group
-##############################################################################
-
 resource "aws_autoscaling_group" "bar" {
-  name                      = 
+  name                      = var.asg-name
   depends_on                = [aws_launch_template.mp1-lt]
-  desired_capacity          = 
-  max_size                  = 
-  min_size                  = 
+  desired_capacity          = var.cnt
+  max_size                  = 5
+  min_size                  = 2
   health_check_grace_period = 300
-  health_check_type         = 
+  health_check_type         = "ELB"
   target_group_arns         = [aws_lb_target_group.alb-lb-tg.arn]
   vpc_zone_identifier       = [data.aws_subnets.subneta.ids[0], data.aws_subnets.subnetb.ids[0]]
 
   tag {
     key                 = "assessment"
-    value               = 
+    value               = var.module-tag
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Name"
+    value               = var.module-tag
     propagate_at_launch = true
   }
 
@@ -204,16 +178,10 @@ resource "aws_autoscaling_group" "bar" {
   }
 }
 
-##############################################################################
-# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/autoscaling_attachment
-##############################################################################
-# Create a new ALB Target Group attachment
-
 resource "aws_autoscaling_attachment" "example" {
-  # Wait for lb to be running before attaching to asg
-  depends_on  = [aws_lb.lb]
-  autoscaling_group_name = 
-  lb_target_group_arn    = 
+  depends_on             = [aws_lb.lb]
+  autoscaling_group_name = aws_autoscaling_group.bar.name
+  lb_target_group_arn    = aws_lb_target_group.alb-lb-tg.arn
 }
 
 output "alb-lb-tg-arn" {
