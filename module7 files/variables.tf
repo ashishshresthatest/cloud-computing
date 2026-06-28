@@ -26,3 +26,5 @@ variable "min" { default = 2 }
 variable "max" { default = 5 }
 variable "desired" { default = 3 }
 variable "module-tag" {}
+variable "raw-s3-bucket" { type = string }
+variable "finished-s3-bucket" { type = string }
